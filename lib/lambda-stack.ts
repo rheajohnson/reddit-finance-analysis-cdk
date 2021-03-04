@@ -25,6 +25,8 @@ export class LambdaStack extends Stack {
             handler: 'lambda_handler',
             runtime: Runtime.PYTHON_3_8,
             memorySize: 512,
+            reservedConcurrentExecutions: 1,
+            retryAttempts: 0,
             environment: {
                 AWS_BUCKET_NAME: props.bucket.bucketName,
                 AWS_SECRET_NAME: props.secret.secretName

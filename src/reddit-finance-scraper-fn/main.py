@@ -16,7 +16,7 @@ subs = ['wallstreetbets', 'stocks', 'investing',
         'stockmarket']     # sub-reddit to search
 p_upvote_ratio = 0.70         # upvote ratio for post to be considered, 0.70 = 70%
 p_upvotes_min = 30       # define # of upvotes, post is considered if upvotes exceed this #
-c_limit = 5      # define the limit, comments 'replace more' limit
+c_limit = 1      # define the limit, comments 'replace more' limit
 c_upvotes_min = 4     # define # of upvotes, comment is considered if upvotes exceed this #
 top_count = 5     # define # of top tickers here
 sentiment_count = 5    # define # of top ticker counts to analyze
