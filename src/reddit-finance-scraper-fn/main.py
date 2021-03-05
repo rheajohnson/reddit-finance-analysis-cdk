@@ -5,6 +5,8 @@ import time
 import boto3
 import json
 import data
+import requests
+from requests_aws4auth import AWS4Auth
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import nltk
 nltk.data.path.append('/tmp')
@@ -12,14 +14,13 @@ nltk.download('vader_lexicon', download_dir='/tmp')
 
 '''############################################################################'''
 # set the program parameters
-subs = ['wallstreetbets', 'stocks', 'investing',
-        'stockmarket']     # sub-reddit to search
-p_upvote_ratio = 0.70         # upvote ratio for post to be considered, 0.70 = 70%
-p_upvotes_min = 30       # define # of upvotes, post is considered if upvotes exceed this #
-c_limit = 1      # define the limit, comments 'replace more' limit
-c_upvotes_min = 4     # define # of upvotes, comment is considered if upvotes exceed this #
-top_count = 5     # define # of top tickers here
-sentiment_count = 5    # define # of top ticker counts to analyze
+subs = ['wallstreetbets', 'stocks', 'stockmarket']
+p_upvote_ratio = 0.70
+p_upvotes_min = 30
+c_limit = 1
+c_upvotes_min = 4
+top_count = 8
+sentiment_count = 8
 '''############################################################################'''
 
 p_analyzed, c_analyzed, comments, all_tickers = 0, 0, {}, {}
@@ -56,15 +57,35 @@ def get_tickers(sub, stockList):
                                     comments[phrase].append(comment.body)
 
 
-def s3_upload(obj, file_name):
-    s3_client = boto3.client('s3')
-    s3_client.put_object(Bucket=os.getenv('AWS_BUCKET_NAME'), Body=bytes(
-        json.dumps(obj).encode('UTF-8')), Key=file_name)
+def update_analysis_data(sentimentAnalysis, tickerAnalysis):
+    session = requests.Session()
+    json_query = {
+        "query": '''
+            mutation ($analysisData: UpdateAnalysisDataInput!) {
+                updateAnalysisData(analysisData: $analysisData) {
+                    sentimentAnalysis,
+                    tickerAnalysis
+                }
+            }
+        ''',
+        "variables": {
+            "analysisData": {
+                "sentimentAnalysis": json.dumps(sentimentAnalysis),
+                "tickerAnalysis": json.dumps(tickerAnalysis),
+            }
+        }
+    }
+
+    session.request(
+        url=os.environ['GRAPHQL_API_ENDPOINT'],
+        method='POST',
+        headers={'x-api-key': os.environ['GRAPHQL_API_KEY']},
+        json=json_query
+    )
 
 
 def get_secret(aws_secret_name):
     region_name = os.getenv('AWS_REGION')
-
     secrets_client = boto3.client('secretsmanager', region_name)
     return secrets_client.get_secret_value(
         SecretId=aws_secret_name
@@ -98,8 +119,6 @@ def lambda_handler(event, lambda_context):
     # print top picks
     print(f'Top tickers identified:\n{top_symbols_counts}\n')
 
-    s3_upload(top_symbols_counts, 'top_counts.json')
-
     # Applying Sentiment Analysis
     scores = {}
 
@@ -122,7 +141,7 @@ def lambda_handler(event, lambda_context):
         for key in score:
             scores[symbol][key] = scores[symbol][key] / len(stock_comments)
 
-    s3_upload(scores, 'sentiment.json')
+    update_analysis_data(scores, top_symbols_counts)
 
     run_time = round(time.time() - start_time)
 

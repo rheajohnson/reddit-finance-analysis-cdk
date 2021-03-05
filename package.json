@@ -23,10 +23,11 @@
   },
   "dependencies": {
     "@aws-cdk/aws-apigateway": "1.89.0",
-    "@aws-cdk/aws-lambda": "1.89.0",
-    "@aws-cdk/aws-lambda-python": "1.89.0",
+    "@aws-cdk/aws-appsync": "1.89.0",
     "@aws-cdk/aws-events": "1.89.0",
     "@aws-cdk/aws-events-targets": "1.89.0",
+    "@aws-cdk/aws-lambda": "1.89.0",
+    "@aws-cdk/aws-lambda-python": "1.89.0",
     "@aws-cdk/aws-s3": "1.89.0",
     "@aws-cdk/core": "1.89.0",
     "aws-sdk": "^2.841.0"

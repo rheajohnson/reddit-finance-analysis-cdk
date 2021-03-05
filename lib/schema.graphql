@@ -1,0 +1,22 @@
+type AnalysisData {
+  tickerAnalysis: String!
+  sentimentAnalysis: String!
+}
+
+input UpdateAnalysisDataInput {
+  tickerAnalysis: String!
+  sentimentAnalysis: String!
+}
+
+type Query {
+  getAnalysisData: AnalysisData
+}
+
+type Mutation {
+  updateAnalysisData(analysisData: UpdateAnalysisDataInput!): AnalysisData
+}
+
+type Subscription {
+  onUpdateAnalysisData: AnalysisData
+    @aws_subscribe(mutations: ["updateAnalysisData"])
+}

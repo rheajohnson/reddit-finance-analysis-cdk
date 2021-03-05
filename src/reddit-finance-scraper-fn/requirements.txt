@@ -2,3 +2,4 @@ praw
 regex
 nltk
 boto3
+requests-aws4auth
