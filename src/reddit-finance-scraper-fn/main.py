@@ -2,6 +2,7 @@ import praw
 import os
 import regex as re
 import time
+import datetime
 import boto3
 import json
 import data
@@ -57,31 +58,28 @@ def get_tickers(sub, stockList):
                                     comments[phrase].append(comment.body)
 
 
-def update_analysis_data(sentimentAnalysis, tickerAnalysis):
+def update_analysis_data(analysis_data):
     session = requests.Session()
     json_query = {
         "query": '''
             mutation ($analysisData: UpdateAnalysisDataInput!) {
-                updateAnalysisData(analysisData: $analysisData) {
-                    sentimentAnalysis,
-                    tickerAnalysis
+                updateAnalysisData(analysisData: $analysisData)  {
+                    timestamp
                 }
             }
         ''',
         "variables": {
-            "analysisData": {
-                "sentimentAnalysis": json.dumps(sentimentAnalysis),
-                "tickerAnalysis": json.dumps(tickerAnalysis),
-            }
+            "analysisData": analysis_data
         }
     }
 
-    session.request(
+    response = session.post(
         url=os.environ['GRAPHQL_API_ENDPOINT'],
-        method='POST',
         headers={'x-api-key': os.environ['GRAPHQL_API_KEY']},
         json=json_query
     )
+
+    print(response.text)
 
 
 def get_secret(aws_secret_name):
@@ -112,15 +110,15 @@ def lambda_handler(event, lambda_context):
     top_tickers = list(tickers_ordered.keys())[0:top_count]
 
     # get top symbols with counts
-    top_symbols_counts = {}
+    top_mention_analysis = {}
     for i in top_tickers:
-        top_symbols_counts[i] = tickers_ordered[i]
+        top_mention_analysis[i] = tickers_ordered[i]
 
     # print top picks
-    print(f'Top tickers identified:\n{top_symbols_counts}\n')
+    print(f'Top tickers identified:\n{top_mention_analysis}\n')
 
     # Applying Sentiment Analysis
-    scores = {}
+    sentiment_analysis = {}
 
     vader = SentimentIntensityAnalyzer()
     # adding custom words from data.py
@@ -132,20 +130,30 @@ def lambda_handler(event, lambda_context):
         stock_comments = comments[symbol]
         for comment in stock_comments:
             score = vader.polarity_scores(comment)
-            if symbol in scores:
+            if symbol in sentiment_analysis:
                 for key in score.keys():
-                    scores[symbol][key] += score[key]
+                    sentiment_analysis[symbol][key] += score[key]
             else:
-                scores[symbol] = score
+                sentiment_analysis[symbol] = score
         # calculating avg.
         for key in score:
-            scores[symbol][key] = scores[symbol][key] / len(stock_comments)
-
-    update_analysis_data(scores, top_symbols_counts)
+            sentiment_analysis[symbol][key] = round(sentiment_analysis[symbol][key] /
+                                                    len(stock_comments), 2)
 
     run_time = round(time.time() - start_time)
 
     # print sentiment
-    print(f'Sentiment analysis:\n{scores}\n')
+    print(f'Sentiment analysis:\n{sentiment_analysis}\n')
 
+    analysis_data = {
+        "sentiment": json.dumps(sentiment_analysis),
+        "topMention": json.dumps(top_mention_analysis),
+        "totalComments": c_analyzed,
+        "totalPosts": p_analyzed,
+        "totalSubreddits": len(subs),
+        "timestamp": str(datetime.datetime.now())
+    }
+
+    update_analysis_data(analysis_data)
+    time.sleep(30)
     print(f'It took {run_time} seconds to analyze {c_analyzed} comments in {p_analyzed} posts in {len(subs)} subreddits.')

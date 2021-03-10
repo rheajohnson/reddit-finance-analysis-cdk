@@ -1,8 +1,13 @@
 import AWS = require("aws-sdk");
 
+
 type AnalysisData = {
-    tickerAnalysis: string;
-    sentimentAnalysis: string;
+    "sentiment": string,
+    "topMention": string,
+    "totalComments": number,
+    "totalPosts": number,
+    "totalSubreddits": number,
+    "timestamp": string
 }
 
 type AppSyncEvent = {
@@ -14,27 +19,19 @@ type AppSyncEvent = {
     }
 }
 
-const analysisTypeFileMap: Array<string> = ["sentimentAnalysis", "tickerAnalysis"]
-
 const getS3Files = async () => {
-    const response: any = {}
+    let response: string = ""
     const s3 = new AWS.S3();
-    for (const analysisType of analysisTypeFileMap) {
-        const s3Response: any = await s3.getObject({ Bucket: process.env.AWS_BUCKET_NAME || "", Key: `${analysisType}.json` }).promise()
-        if (s3Response && s3Response.Body) {
-            const objectData = s3Response.Body.toString('utf-8')
-            response[analysisType] = objectData;
-        }
+    const s3Response: any = await s3.getObject({ Bucket: process.env.AWS_BUCKET_NAME || "", Key: 'analysisData.json' }).promise()
+    if (s3Response && s3Response.Body) {
+        response = s3Response.Body.toString('utf-8')
     }
     return response
 }
 
-const updateS3Files = async (data: any) => {
+const updateS3Files = async (data: object) => {
     const s3 = new AWS.S3();
-    for (const analysisType of analysisTypeFileMap) {
-        console.log(data[analysisType])
-        await s3.putObject({ Bucket: process.env.AWS_BUCKET_NAME || "", Key: `${analysisType}.json`, Body: data[analysisType], ContentType: 'application/json; charset=utf-8' }).promise()
-    }
+    await s3.putObject({ Bucket: process.env.AWS_BUCKET_NAME || "", Key: 'analysisData.json', Body: JSON.stringify(data), ContentType: 'application/json; charset=utf-8' }).promise()
     return data
 }
 

@@ -1,11 +1,19 @@
 type AnalysisData {
-  tickerAnalysis: String!
-  sentimentAnalysis: String!
+  sentiment: String!
+  topMention: String!
+  totalComments: Int!
+  totalPosts: Int!
+  totalSubreddits: Int!
+  timestamp: String!
 }
 
 input UpdateAnalysisDataInput {
-  tickerAnalysis: String!
-  sentimentAnalysis: String!
+  sentiment: String!
+  topMention: String!
+  totalComments: Int!
+  totalPosts: Int!
+  totalSubreddits: Int!
+  timestamp: String!
 }
 
 type Query {
