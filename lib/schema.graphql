@@ -1,5 +1,5 @@
 type AnalysisData {
-  sentiment: String!
+  topSentiment: String!
   topMention: String!
   totalComments: Int!
   totalPosts: Int!
@@ -8,7 +8,7 @@ type AnalysisData {
 }
 
 input UpdateAnalysisDataInput {
-  sentiment: String!
+  topSentiment: String!
   topMention: String!
   totalComments: Int!
   totalPosts: Int!

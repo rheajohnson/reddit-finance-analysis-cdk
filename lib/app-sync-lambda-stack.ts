@@ -104,7 +104,7 @@ export class AppSyncLambdaStack extends Stack {
 
         // Run lambda every hour
         const lambdaRule = new Rule(this, 'LambdaRule', {
-            schedule: Schedule.expression('rate(15 minutes)')
+            schedule: Schedule.expression('rate(5 minutes)')
         });
         lambdaRule.addTarget(new LambdaFunction(redditFinanceScraperFn));
     }

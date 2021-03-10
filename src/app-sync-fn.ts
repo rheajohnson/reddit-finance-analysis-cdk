@@ -20,11 +20,11 @@ type AppSyncEvent = {
 }
 
 const getS3Files = async () => {
-    let response: string = ""
+    let response: any = {}
     const s3 = new AWS.S3();
     const s3Response: any = await s3.getObject({ Bucket: process.env.AWS_BUCKET_NAME || "", Key: 'analysisData.json' }).promise()
     if (s3Response && s3Response.Body) {
-        response = s3Response.Body.toString('utf-8')
+        response = JSON.parse(s3Response.Body.toString('utf-8'))
     }
     return response
 }
@@ -36,7 +36,6 @@ const updateS3Files = async (data: object) => {
 }
 
 export const handler = async (event: AppSyncEvent) => {
-    console.log(event)
     switch (event.info.fieldName) {
         case "getAnalysisData":
             return await getS3Files();

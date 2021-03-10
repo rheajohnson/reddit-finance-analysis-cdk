@@ -7,7 +7,6 @@ import boto3
 import json
 import data
 import requests
-from requests_aws4auth import AWS4Auth
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import nltk
 nltk.data.path.append('/tmp')
@@ -17,9 +16,9 @@ nltk.download('vader_lexicon', download_dir='/tmp')
 # set the program parameters
 subs = ['wallstreetbets', 'stocks', 'stockmarket']
 p_upvote_ratio = 0.70
-p_upvotes_min = 30
-c_limit = 1
-c_upvotes_min = 4
+p_upvotes_min = 5
+c_limit = 10
+c_upvotes_min = 2
 top_count = 8
 sentiment_count = 8
 '''############################################################################'''
@@ -28,34 +27,41 @@ p_analyzed, c_analyzed, comments, all_tickers = 0, 0, {}, {}
 
 
 def get_tickers(sub, stockList):
+    global p_analyzed, c_analyzed
     reddit = praw.Reddit(
         client_id=os.getenv('REDDIT_ID'),
         client_secret=os.getenv('REDDIT_SECRET'),
         user_agent=os.getenv('REDDIT_USER_AGENT'),
     )
-    global p_analyzed, c_analyzed
     regex_pattern = r'\b([A-Z]+)\b'
     ticker_dict = stockList
     for submission in reddit.subreddit(sub).hot():
-        # checking: post upvote ratio # of upvotes, post flair, and author
+        # checking: post upvote ratio, # of upvotes
         if submission.upvote_ratio >= p_upvote_ratio and submission.ups > p_upvotes_min:
             submission.comment_sort = 'new'
             strings = [submission.title]
+            # getting additional comments from comment tree
+            try:
+                submission.comments.replace_more(limit=c_limit)
+            except Exception as e:
+                print(e)
+                submission.comments.replace_more(limit=0)
             p_analyzed += 1
-            submission.comments.replace_more(limit=c_limit)
             for comment in submission.comments.list():
                 c_analyzed += 1
-                strings.append(comment.body)
+                # checking: comment upvotes
                 if comment.score > c_upvotes_min:
-                    for s in strings:
-                        for phrase in re.findall(regex_pattern, s):
-                            if phrase not in data.blacklist and phrase in ticker_dict:
-                                if phrase not in all_tickers:
-                                    all_tickers[phrase] = 1
-                                    comments[phrase] = [comment.body]
-                                else:
-                                    all_tickers[phrase] += 1
-                                    comments[phrase].append(comment.body)
+                    strings.append(comment.body)
+            # identifying tickers in strings and adding to comments dict for later sentiment analysis
+            for s in strings:
+                for phrase in re.findall(regex_pattern, s):
+                    if phrase not in data.blacklist and phrase in ticker_dict:
+                        if phrase not in all_tickers:
+                            all_tickers[phrase] = 1
+                            comments[phrase] = [s]
+                        else:
+                            all_tickers[phrase] += 1
+                            comments[phrase].append(s)
 
 
 def update_analysis_data(analysis_data):
@@ -64,6 +70,11 @@ def update_analysis_data(analysis_data):
         "query": '''
             mutation ($analysisData: UpdateAnalysisDataInput!) {
                 updateAnalysisData(analysisData: $analysisData)  {
+                    topSentiment
+                    topMention
+                    totalComments
+                    totalPosts
+                    totalSubreddits
                     timestamp
                 }
             }
@@ -72,13 +83,11 @@ def update_analysis_data(analysis_data):
             "analysisData": analysis_data
         }
     }
-
     response = session.post(
         url=os.environ['GRAPHQL_API_ENDPOINT'],
         headers={'x-api-key': os.environ['GRAPHQL_API_KEY']},
         json=json_query
     )
-
     print(response.text)
 
 
@@ -92,6 +101,10 @@ def get_secret(aws_secret_name):
 
 def lambda_handler(event, lambda_context):
     start_time = time.time()
+
+    # Resetting global variables due to lambda cache
+    global p_analyzed, c_analyzed, comments, all_tickers
+    p_analyzed, c_analyzed, comments, all_tickers = 0, 0, {}, {}
 
     # get secret values from aws and set to environment
     secret_response = get_secret(os.environ['AWS_SECRET_NAME'])
@@ -146,7 +159,7 @@ def lambda_handler(event, lambda_context):
     print(f'Sentiment analysis:\n{sentiment_analysis}\n')
 
     analysis_data = {
-        "sentiment": json.dumps(sentiment_analysis),
+        "topSentiment": json.dumps(sentiment_analysis),
         "topMention": json.dumps(top_mention_analysis),
         "totalComments": c_analyzed,
         "totalPosts": p_analyzed,
@@ -155,5 +168,4 @@ def lambda_handler(event, lambda_context):
     }
 
     update_analysis_data(analysis_data)
-    time.sleep(30)
     print(f'It took {run_time} seconds to analyze {c_analyzed} comments in {p_analyzed} posts in {len(subs)} subreddits.')
