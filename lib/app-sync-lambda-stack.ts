@@ -1,4 +1,4 @@
-import { Construct, Stack, StackProps, CfnOutput, Duration, } from '@aws-cdk/core';
+import { Construct, Stack, StackProps, CfnOutput, Duration, Expiration } from '@aws-cdk/core';
 import { Schema, GraphqlApi, AuthorizationType } from '@aws-cdk/aws-appsync';
 import { Secret } from "@aws-cdk/aws-secretsmanager";
 import { Bucket } from '@aws-cdk/aws-s3';
@@ -26,6 +26,9 @@ export class AppSyncLambdaStack extends Stack {
             authorizationConfig: {
                 defaultAuthorization: {
                     authorizationType: AuthorizationType.API_KEY,
+                    apiKeyConfig: {
+                        expires: Expiration.after(Duration.days(365))
+                    }
                 },
             },
             xrayEnabled: true,
@@ -104,7 +107,7 @@ export class AppSyncLambdaStack extends Stack {
 
         // Run lambda every hour
         const lambdaRule = new Rule(this, 'LambdaRule', {
-            schedule: Schedule.expression('rate(5 minutes)')
+            schedule: Schedule.expression('rate(30 minutes)')
         });
         lambdaRule.addTarget(new LambdaFunction(redditFinanceScraperFn));
     }
